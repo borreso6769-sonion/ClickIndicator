@@ -8,7 +8,7 @@
 	},
 	"id": "borreso6769-sonion.click-indicator",
 	"name": "Click Indicator",
-	"version": "v1.2.0",
+	"version": "v1.3.0",
 	"developer": "borreso6769-sonion",
 	"description": "Graba tus clicks en modo practica y luego te muestra donde clickear (linea blanca) y cuanto mantener (barra verde). No es un bot.",
 	"tags": ["utility", "interface"]
