@@ -9,11 +9,12 @@
 // =====================================================================
 //  Popup: pedir nombre para guardar
 // =====================================================================
-class NamePopup : public geode::Popup<> {
+class NamePopup : public geode::Popup {
 protected:
     TextInput* m_input = nullptr;
 
-    bool setup() override {
+    bool init() {
+        if (!Popup::init(260.f, 140.f)) return false;
         this->setTitle("Guardar grabacion");
 
         m_input = TextInput::create(200.f, "Nombre", "bigFont.fnt");
@@ -44,7 +45,7 @@ protected:
 public:
     static NamePopup* create() {
         auto ret = new NamePopup();
-        if (ret->initAnchored(260.f, 140.f)) {
+        if (ret->init()) {
             ret->autorelease();
             return ret;
         }
@@ -56,9 +57,10 @@ public:
 // =====================================================================
 //  Popup: lista de grabaciones guardadas (del nivel actual)
 // =====================================================================
-class SavedListPopup : public geode::Popup<> {
+class SavedListPopup : public geode::Popup {
 protected:
-    bool setup() override {
+    bool init() {
+        if (!Popup::init(260.f, 210.f)) return false;
         this->setTitle("Guardados");
 
         auto list = ci::listForLevel();
@@ -114,7 +116,7 @@ protected:
 public:
     static SavedListPopup* create() {
         auto ret = new SavedListPopup();
-        if (ret->initAnchored(260.f, 210.f)) {
+        if (ret->init()) {
             ret->autorelease();
             return ret;
         }
@@ -126,13 +128,14 @@ public:
 // =====================================================================
 //  Menu principal: Empezar/Detener, Guardar, Borrar, Usar, Guardados
 // =====================================================================
-class MenuPopup : public geode::Popup<> {
+class MenuPopup : public geode::Popup {
 protected:
     ButtonSprite* m_startSpr = nullptr;
     ButtonSprite* m_useSpr = nullptr;
     CCLabelBMFont* m_status = nullptr;
 
-    bool setup() override {
+    bool init() {
+        if (!Popup::init(240.f, 290.f)) return false;
         this->setTitle("Click Indicator");
 
         auto makeBtn = [this](char const* text, SEL_MenuHandler cb, float y, ButtonSprite*& out) {
@@ -244,7 +247,7 @@ protected:
 public:
     static MenuPopup* create() {
         auto ret = new MenuPopup();
-        if (ret->initAnchored(240.f, 290.f)) {
+        if (ret->init()) {
             ret->autorelease();
             return ret;
         }
