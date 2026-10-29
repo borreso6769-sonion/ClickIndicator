@@ -95,7 +95,7 @@ namespace ci {
     inline bool  getShowTower()  { return Mod::get()->getSavedValue<bool>("show-tower", true); }
     inline bool  getShowLine()   { return Mod::get()->getSavedValue<bool>("show-player-line", true); }
     inline float getTowerScale() { return Mod::get()->getSavedValue<float>("tower-scale", 1.0f); }
-    inline float getWarnBlocks() { return Mod::get()->getSavedValue<float>("warn-blocks", 12.0f); }
+    inline float getWarnBlocks() { return Mod::get()->getSavedValue<float>("warn-blocks", 15.0f); }
 
     // ---------- Elementos visuales ----------
 
@@ -116,51 +116,66 @@ namespace ci {
         lastFrac = -1.f;
     }
 
-    // Dibuja la torre: los escalones se encienden de abajo hacia arriba segun frac (0..1)
-    inline void drawTower(float frac) {
+    // CCDrawNode mezcla con alfa PREMULTIPLICADO: si no multiplicamos el color por el alfa,
+    // un alfa de 0 sigue viendose. Este helper lo hace bien.
+    inline ccColor4F pm(float r, float g, float b, float a) {
+        a = std::clamp(a, 0.f, 1.f);
+        return {r * a, g * a, b * a, a};
+    }
+
+    // Carril estilo Guitar Hero: las flechas bajan y hay que clickear cuando tocan la linea
+    // marcada por los chevrones ">  <". Las barras verdes largas son los holds.
+    inline void drawLane(float px) {
         if (!towerNode) return;
         towerNode->clear();
 
-        constexpr float H = 110.f, bw = 44.f, tw = 26.f;
-        constexpr int N = 8;
-        auto widthAt = [&](float y) { return bw + (tw - bw) * (y / H); };
-
+        constexpr float H = 180.f, W = 56.f;
+        float warn = std::max(1.f, getWarnBlocks()) * 30.f; // 1 bloque = 30 unidades
         ccColor4F clear = {0.f, 0.f, 0.f, 0.f};
-        ccColor4F rail = {0.25f, 1.f, 0.35f, 0.85f};
-        ccColor4F dim = {0.15f, 0.6f, 0.2f, 0.22f};
 
-        // Rieles
-        for (float s : {-1.f, 1.f}) {
-            CCPoint r[4] = {
-                {s * bw / 2, 0.f}, {s * bw / 2 - s * 4.f, 0.f},
-                {s * tw / 2 - s * 4.f, H}, {s * tw / 2, H}
-            };
-            towerNode->drawPolygon(r, 4, rail, 0.f, clear);
-        }
+        // Fondo del carril
+        CCPoint bg[4] = {{-W / 2, 0.f}, {W / 2, 0.f}, {W / 2, H}, {-W / 2, H}};
+        towerNode->drawPolygon(bg, 4, pm(0.f, 0.f, 0.f, 0.38f), 1.f, pm(0.3f, 1.f, 0.4f, 0.45f));
 
-        // Escalones
-        for (int i = 0; i < N; i++) {
-            float y = 8.f + i * (H - 22.f) / (N - 1);
-            float h = 8.f;
-            float w = widthAt(y + h / 2) - 8.f;
-            CCPoint p[4] = {{-w / 2, y}, {w / 2, y}, {w / 2, y + h}, {-w / 2, y + h}};
-            towerNode->drawPolygon(p, 4, dim, 0.f, clear);
+        bool active = false;
+        float nw = W - 12.f;
 
-            float amt = std::clamp(frac * N - i, 0.f, 1.f);
-            if (amt > 0.f) {
-                towerNode->drawPolygon(p, 4, ccc4f(0.3f, 1.f, 0.4f, amt), 0.f, clear);
+        for (auto const& c : loaded) {
+            if (px > c.x2) continue;                 // ya paso
+            if (c.x1 - px > warn) break;             // todavia muy lejos (estan ordenados)
+
+            if (px >= c.x1) active = true;
+
+            float yBot = std::clamp(std::max(0.f, c.x1 - px) / warn * H, 0.f, H);
+            float yTop = std::clamp((c.x2 - px) / warn * H, 0.f, H);
+            bool hold = (c.x2 - c.x1) > 3.f;
+
+            // Barra del hold (cuanto mantener)
+            if (hold && yTop - yBot > 0.5f) {
+                CCPoint r[4] = {{-nw / 2, yBot}, {nw / 2, yBot}, {nw / 2, yTop}, {-nw / 2, yTop}};
+                towerNode->drawPolygon(r, 4, pm(0.15f, 1.f, 0.25f, 0.55f), 1.f, pm(0.3f, 1.f, 0.4f, 0.95f));
+            }
+
+            // Flecha de inicio (solo mientras aun no llegas a ella)
+            if (c.x1 >= px) {
+                float hw = nw / 2;
+                CCPoint tri[3] = {{0.f, yBot}, {-hw, yBot + 12.f}, {hw, yBot + 12.f}};
+                towerNode->drawPolygon(tri, 3, pm(1.f, 1.f, 1.f, 0.95f), 1.f, pm(0.3f, 1.f, 0.4f, 1.f));
+                CCPoint stem[4] = {{-hw / 2, yBot + 12.f}, {hw / 2, yBot + 12.f}, {hw / 2, yBot + 22.f}, {-hw / 2, yBot + 22.f}};
+                towerNode->drawPolygon(stem, 4, pm(1.f, 1.f, 1.f, 0.95f), 1.f, pm(0.3f, 1.f, 0.4f, 1.f));
             }
         }
 
-        // Base y flechas laterales
-        CCPoint base[4] = {{-bw / 2, -5.f}, {bw / 2, -5.f}, {bw / 2, 0.f}, {-bw / 2, 0.f}};
-        towerNode->drawPolygon(base, 4, ccc4f(0.4f, 0.9f, 0.5f, 0.6f), 0.f, clear);
+        // Linea de impacto: aqui debe llegar la flecha para clickear
+        auto hit = active ? pm(0.3f, 1.f, 0.4f, 1.f) : pm(1.f, 1.f, 1.f, 0.9f);
+        towerNode->drawSegment({-W / 2 - 6.f, 0.f}, {W / 2 + 6.f, 0.f}, active ? 3.f : 1.8f, hit);
 
-        ccColor4F ch = {0.25f, 1.f, 0.35f, 0.9f};
-        towerNode->drawSegment({-bw / 2 - 24.f, 16.f}, {-bw / 2 - 11.f, 7.f}, 2.5f, ch);
-        towerNode->drawSegment({-bw / 2 - 11.f, 7.f}, {-bw / 2 - 24.f, -2.f}, 2.5f, ch);
-        towerNode->drawSegment({bw / 2 + 24.f, 16.f}, {bw / 2 + 11.f, 7.f}, 2.5f, ch);
-        towerNode->drawSegment({bw / 2 + 11.f, 7.f}, {bw / 2 + 24.f, -2.f}, 2.5f, ch);
+        // Chevrones laterales ">  <" (senalan la linea de impacto)
+        auto ch = pm(0.25f, 1.f, 0.35f, 0.95f);
+        towerNode->drawSegment({-W / 2 - 34.f, 13.f}, {-W / 2 - 16.f, 0.f}, 3.f, ch);
+        towerNode->drawSegment({-W / 2 - 16.f, 0.f}, {-W / 2 - 34.f, -13.f}, 3.f, ch);
+        towerNode->drawSegment({W / 2 + 34.f, 13.f}, {W / 2 + 16.f, 0.f}, 3.f, ch);
+        towerNode->drawSegment({W / 2 + 16.f, 0.f}, {W / 2 + 34.f, -13.f}, 3.f, ch);
     }
 
     // Crea (o recrea) todo lo que se dibuja: guias, linea del jugador y torre
@@ -184,13 +199,13 @@ namespace ci {
             auto node = CCDrawNode::create();
 
             // Barra verde: cuanto hay que mantener el click
-            if (c.x2 - c.x1 > 0.5f) {
+            if (op > 0.01f && c.x2 - c.x1 > 0.5f) {
                 CCPoint g[4] = {{c.x1, bottom}, {c.x2, bottom}, {c.x2, top}, {c.x1, top}};
-                node->drawPolygon(g, 4, ccc4f(0.15f, 1.f, 0.25f, op), 1.f, ccc4f(0.2f, 1.f, 0.3f, std::min(1.f, op + 0.45f)));
+                node->drawPolygon(g, 4, pm(0.15f, 1.f, 0.25f, op), 1.f, pm(0.2f, 1.f, 0.3f, op * 1.6f));
             }
             // Linea blanca: donde empezar el click
             CCPoint w[4] = {{c.x1 - 1.5f, bottom}, {c.x1 + 1.5f, bottom}, {c.x1 + 1.5f, top}, {c.x1 - 1.5f, top}};
-            node->drawPolygon(w, 4, ccc4f(1.f, 1.f, 1.f, 0.95f), 0.f, clear);
+            node->drawPolygon(w, 4, pm(1.f, 1.f, 1.f, 0.95f), 0.f, clear);
 
             overlayRoot->addChild(node);
             guideNodes.push_back(node);
@@ -200,7 +215,7 @@ namespace ci {
         if (getShowLine()) {
             lineNode = CCDrawNode::create();
             CCPoint l[4] = {{-1.5f, bottom}, {1.5f, bottom}, {1.5f, top}, {-1.5f, top}};
-            lineNode->drawPolygon(l, 4, ccc4f(1.f, 1.f, 1.f, 1.f), 0.f, clear);
+            lineNode->drawPolygon(l, 4, pm(1.f, 1.f, 1.f, 1.f), 0.f, clear);
             pl->m_objectLayer->addChild(lineNode, 1001);
         }
 
@@ -208,10 +223,10 @@ namespace ci {
         if (getShowTower() && pl->m_uiLayer) {
             auto win = CCDirector::get()->getWinSize();
             towerNode = CCDrawNode::create();
-            towerNode->setPosition({win.width * 0.11f, win.height * 0.22f});
+            towerNode->setPosition({win.width * 0.12f, win.height * 0.20f});
             towerNode->setScale(std::clamp(getTowerScale(), 0.4f, 2.f));
             pl->m_uiLayer->addChild(towerNode, 100);
-            drawTower(0.f);
+            drawLane(pl->m_player1 ? pl->m_player1->getPositionX() : 0.f);
         }
     }
 
@@ -228,21 +243,7 @@ namespace ci {
 
         if (lineNode) lineNode->setPositionX(px);
 
-        if (towerNode) {
-            float warn = std::max(1.f, getWarnBlocks()) * 30.f;
-            float frac = 0.f;
-            for (auto const& c : loaded) {
-                if (px > c.x2) continue; // ya paso
-                float len = c.x2 - c.x1;
-                if (px < c.x1) frac = std::clamp(1.f - (c.x1 - px) / warn, 0.f, 1.f);
-                else if (len > 3.f) frac = std::clamp(1.f - (px - c.x1) / len, 0.f, 1.f);
-                break;
-            }
-            if (std::abs(frac - lastFrac) > 0.003f) {
-                lastFrac = frac;
-                drawTower(frac);
-            }
-        }
+        if (towerNode) drawLane(px);
     }
 
     // ---------- Operaciones ----------
