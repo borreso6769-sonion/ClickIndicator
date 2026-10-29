@@ -60,8 +60,12 @@ public:
 class SavedListPopup : public geode::Popup {
 protected:
     bool init() {
-        if (!Popup::init(260.f, 210.f)) return false;
+        if (!Popup::init(260.f, 245.f)) return false;
         this->setTitle("Guardados");
+
+        auto folderSpr = ButtonSprite::create("Carpeta", 90, true, "bigFont.fnt", "GJ_button_04.png", 24.f, 0.5f);
+        auto folderBtn = CCMenuItemSpriteExtra::create(folderSpr, this, menu_selector(SavedListPopup::onFolder));
+        m_buttonMenu->addChildAtPosition(folderBtn, Anchor::Bottom, {0.f, 20.f});
 
         auto list = ci::listForLevel();
 
@@ -109,8 +113,12 @@ protected:
         scroll->m_contentLayer->updateLayout();
         scroll->moveToTop();
 
-        m_mainLayer->addChildAtPosition(scroll, Anchor::Center, {-W / 2.f, -H / 2.f - 8.f});
+        m_mainLayer->addChildAtPosition(scroll, Anchor::Center, {-W / 2.f, -H / 2.f + 2.f});
         return true;
+    }
+
+    void onFolder(CCObject*) {
+        utils::file::openFolder(ci::recordingsDir());
     }
 
 public:
@@ -148,29 +156,34 @@ protected:
         return slider;
     }
 
+    CCMenuItemToggler* makeToggle(char const* text, float y, bool value, SEL_MenuHandler cb) {
+        auto t = CCMenuItemToggler::createWithStandardSprites(this, cb, 0.7f);
+        t->toggle(value);
+        m_buttonMenu->addChildAtPosition(t, Anchor::Center, {-105.f, y});
+        auto lbl = CCLabelBMFont::create(text, "bigFont.fnt");
+        lbl->setScale(0.4f);
+        lbl->setAnchorPoint({0.f, 0.5f});
+        m_mainLayer->addChildAtPosition(lbl, Anchor::Center, {-82.f, y});
+        return t;
+    }
+
     bool init() {
-        if (!Popup::init(280.f, 310.f)) return false;
+        if (!Popup::init(290.f, 400.f)) return false;
         this->setTitle("Personalizar");
 
-        m_opLbl = makeLabel("", 98.f);
-        makeSlider(78.f, menu_selector(PersonalizePopup::onOpacity), ci::getOpacity());
+        m_opLbl = makeLabel("", 140.f);
+        makeSlider(120.f, menu_selector(PersonalizePopup::onOpacity), ci::getOpacity());
 
-        m_sizeLbl = makeLabel("", 46.f);
-        makeSlider(26.f, menu_selector(PersonalizePopup::onSize), ci::getTowerScale() - 0.5f);
+        m_sizeLbl = makeLabel("", 88.f);
+        makeSlider(68.f, menu_selector(PersonalizePopup::onSize), ci::getTowerScale() - 0.5f);
 
-        m_distLbl = makeLabel("", -6.f);
-        makeSlider(-26.f, menu_selector(PersonalizePopup::onDist), (ci::getWarnBlocks() - 5.f) / 25.f);
+        m_distLbl = makeLabel("", 36.f);
+        makeSlider(16.f, menu_selector(PersonalizePopup::onDist), (ci::getWarnBlocks() - 5.f) / 25.f);
 
-        auto t1 = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(PersonalizePopup::onTower), 0.7f);
-        t1->toggle(ci::getShowTower());
-        m_buttonMenu->addChildAtPosition(t1, Anchor::Center, {-100.f, -68.f});
-        auto l1 = makeLabel("Mostrar carril de flechas", -68.f, 10.f);
-
-        auto t2 = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(PersonalizePopup::onLine), 0.7f);
-        t2->toggle(ci::getShowLine());
-        m_buttonMenu->addChildAtPosition(t2, Anchor::Center, {-100.f, -108.f});
-        auto l2 = makeLabel("Linea del jugador", -108.f, 10.f);
-        (void)l1; (void)l2;
+        makeToggle("Mostrar carril de cuadros", -30.f, ci::getShowTower(), menu_selector(PersonalizePopup::onTower));
+        makeToggle("Linea del jugador", -70.f, ci::getShowLine(), menu_selector(PersonalizePopup::onLine));
+        makeToggle("Mostrar juicios", -110.f, ci::getShowJudge(), menu_selector(PersonalizePopup::onJudge));
+        makeToggle("Combo y precision", -150.f, ci::getShowStats(), menu_selector(PersonalizePopup::onStats));
 
         this->refreshLabels();
         return true;
@@ -179,7 +192,7 @@ protected:
     void refreshLabels() {
         m_opLbl->setString(fmt::format("Opacidad de la barra verde: {}%", static_cast<int>(std::round(ci::getOpacity() * 100.f))).c_str());
         m_sizeLbl->setString(fmt::format("Tamano del carril: {}%", static_cast<int>(std::round(ci::getTowerScale() * 100.f))).c_str());
-        m_distLbl->setString(fmt::format("Distancia de las flechas: {} bloques", static_cast<int>(std::round(ci::getWarnBlocks()))).c_str());
+        m_distLbl->setString(fmt::format("Distancia de los cuadros: {} bloques", static_cast<int>(std::round(ci::getWarnBlocks()))).c_str());
     }
 
     void onOpacity(CCObject* sender) {
@@ -214,9 +227,69 @@ protected:
         ci::refreshOverlay();
     }
 
+    void onJudge(CCObject* sender) {
+        bool on = !static_cast<CCMenuItemToggler*>(sender)->isToggled();
+        Mod::get()->setSavedValue<bool>("show-judge", on);
+    }
+
+    void onStats(CCObject* sender) {
+        bool on = !static_cast<CCMenuItemToggler*>(sender)->isToggled();
+        Mod::get()->setSavedValue<bool>("show-stats", on);
+        ci::updateStats();
+    }
+
 public:
     static PersonalizePopup* create() {
         auto ret = new PersonalizePopup();
+        if (ret->init()) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+};
+
+// =====================================================================
+//  Popup: Temas
+// =====================================================================
+class ThemesPopup : public geode::Popup {
+protected:
+    bool init() {
+        if (!Popup::init(300.f, 300.f)) return false;
+        this->setTitle("Temas");
+
+        constexpr float rowH = 58.f;
+        float y0 = (ci::THEME_COUNT - 1) * rowH / 2.f - 8.f;
+
+        for (int i = 0; i < ci::THEME_COUNT; i++) {
+            auto const& t = ci::themeAt(i);
+            float y = y0 - i * rowH;
+            bool selected = (i == ci::themeIndex());
+
+            auto spr = ButtonSprite::create(
+                t.name, 150, true, "bigFont.fnt",
+                selected ? "GJ_button_02.png" : "GJ_button_01.png", 30.f, 0.7f
+            );
+            auto btn = CCMenuItemExt::createSpriteExtra(spr, [this, i](CCMenuItemSpriteExtra*) {
+                Mod::get()->setSavedValue<int>("theme", i);
+                ci::refreshOverlay();
+                Notification::create(std::string("Tema: ") + ci::themeAt(i).name, NotificationIcon::Success)->show();
+                this->onClose(nullptr);
+            });
+            m_buttonMenu->addChildAtPosition(btn, Anchor::Center, {0.f, y + 8.f});
+
+            auto desc = CCLabelBMFont::create(t.desc, "chatFont.fnt");
+            desc->setScale(0.62f);
+            desc->setOpacity(190);
+            m_mainLayer->addChildAtPosition(desc, Anchor::Center, {0.f, y - 14.f});
+        }
+        return true;
+    }
+
+public:
+    static ThemesPopup* create() {
+        auto ret = new ThemesPopup();
         if (ret->init()) {
             ret->autorelease();
             return ret;
@@ -236,33 +309,29 @@ protected:
     CCLabelBMFont* m_status = nullptr;
 
     bool init() {
-        if (!Popup::init(240.f, 340.f)) return false;
+        if (!Popup::init(240.f, 385.f)) return false;
         this->setTitle("Click Indicator");
 
-        auto makeBtn = [this](char const* text, SEL_MenuHandler cb, float y, ButtonSprite*& out) {
-            out = ButtonSprite::create(text, 150, true, "bigFont.fnt", "GJ_button_01.png", 30.f, 0.7f);
+        auto makeBtn = [this](char const* text, SEL_MenuHandler cb, float y, ButtonSprite*& out, char const* bg = "GJ_button_01.png") {
+            out = ButtonSprite::create(text, 150, true, "bigFont.fnt", bg, 30.f, 0.7f);
             auto btn = CCMenuItemSpriteExtra::create(out, this, cb);
             m_buttonMenu->addChildAtPosition(btn, Anchor::Center, {0.f, y});
         };
         ButtonSprite* tmp = nullptr;
 
-        makeBtn("Empezar", menu_selector(MenuPopup::onStart), 90.f, m_startSpr);
-        makeBtn("Guardar", menu_selector(MenuPopup::onSave), 52.f, tmp);
-        makeBtn("Borrar", menu_selector(MenuPopup::onDelete), 14.f, tmp);
-        makeBtn("Usar", menu_selector(MenuPopup::onUse), -24.f, m_useSpr);
+        makeBtn("Empezar", menu_selector(MenuPopup::onStart), 118.f, m_startSpr);
+        makeBtn("Guardar", menu_selector(MenuPopup::onSave), 80.f, tmp);
+        makeBtn("Borrar", menu_selector(MenuPopup::onDelete), 42.f, tmp);
+        makeBtn("Usar", menu_selector(MenuPopup::onUse), 4.f, m_useSpr);
 
-        // Boton de abajo: abre la lista de guardados
-        auto listSpr = ButtonSprite::create("Guardados", 150, true, "bigFont.fnt", "GJ_button_02.png", 30.f, 0.7f);
-        auto listBtn = CCMenuItemSpriteExtra::create(listSpr, this, menu_selector(MenuPopup::onList));
-        m_buttonMenu->addChildAtPosition(listBtn, Anchor::Center, {0.f, -70.f});
-
-        auto perSpr = ButtonSprite::create("Personalizar", 150, true, "bigFont.fnt", "GJ_button_02.png", 30.f, 0.7f);
-        auto perBtn = CCMenuItemSpriteExtra::create(perSpr, this, menu_selector(MenuPopup::onCustomize));
-        m_buttonMenu->addChildAtPosition(perBtn, Anchor::Center, {0.f, -108.f});
+        // Botones de abajo
+        makeBtn("Guardados", menu_selector(MenuPopup::onList), -42.f, tmp, "GJ_button_02.png");
+        makeBtn("Personalizar", menu_selector(MenuPopup::onCustomize), -80.f, tmp, "GJ_button_02.png");
+        makeBtn("Temas", menu_selector(MenuPopup::onThemes), -118.f, tmp, "GJ_button_02.png");
 
         m_status = CCLabelBMFont::create("", "chatFont.fnt");
         m_status->setScale(0.8f);
-        m_mainLayer->addChildAtPosition(m_status, Anchor::Top, {0.f, -42.f});
+        m_mainLayer->addChildAtPosition(m_status, Anchor::Top, {0.f, -40.f});
 
         this->refreshUI();
         return true;
@@ -341,7 +410,11 @@ protected:
             }
             ci::usingSaved = true;
         }
+        ci::rememberUse();
         ci::refreshOverlay();
+        if (ci::usingSaved) {
+            if (auto pl = PlayLayer::get(); pl && pl->m_player1) ci::resetJudge(pl->m_player1->getPositionX());
+        }
         this->refreshUI();
     }
 
@@ -351,6 +424,10 @@ protected:
 
     void onCustomize(CCObject*) {
         PersonalizePopup::create()->show();
+    }
+
+    void onThemes(CCObject*) {
+        ThemesPopup::create()->show();
     }
 
 public:
@@ -433,6 +510,9 @@ class $modify(CIPlayerObject, PlayerObject) {
                 ci::onPress(this->getPositionX());
             }
         }
+        if (pl && ci::usingSaved && btn == PlayerButton::Jump && this == pl->m_player1) {
+            ci::judgePress(this->getPositionX());
+        }
         return res;
     }
 
@@ -441,6 +521,9 @@ class $modify(CIPlayerObject, PlayerObject) {
         auto pl = PlayLayer::get();
         if (pl && ci::recording && btn == PlayerButton::Jump && this == pl->m_player1) {
             ci::onRelease(this->getPositionX());
+        }
+        if (pl && ci::usingSaved && btn == PlayerButton::Jump && this == pl->m_player1) {
+            ci::judgeRelease(this->getPositionX());
         }
         return res;
     }
@@ -453,6 +536,9 @@ class $modify(CIPlayLayer, PlayLayer) {
     void setupHasCompleted() {
         PlayLayer::setupHasCompleted();
         ci::resetAll();
+        ci::autoLoad(this);   // vuelve a cargar la ultima grabacion usada en este nivel
+        ci::refreshOverlay();
+        ci::resetJudge(m_player1 ? m_player1->getPositionX() : 0.f);
     }
 
     void resetLevel() {
@@ -462,7 +548,10 @@ class $modify(CIPlayLayer, PlayLayer) {
             ci::truncateAt(m_player1->getPositionX());
         }
         // El overlay vive en m_objectLayer; lo re-dibujamos por seguridad
-        if (ci::usingSaved) ci::refreshOverlay();
+        if (ci::usingSaved) {
+            ci::refreshOverlay();
+            ci::resetJudge(m_player1 ? m_player1->getPositionX() : 0.f);
+        }
     }
 
     void levelComplete() {
@@ -482,7 +571,7 @@ class $modify(CIPlayLayer, PlayLayer) {
 
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        if (ci::usingSaved) ci::updateVisuals(this);
+        if (ci::usingSaved) ci::updateVisuals(this, dt);
     }
 
     void onQuit() {
