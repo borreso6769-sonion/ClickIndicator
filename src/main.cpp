@@ -164,7 +164,7 @@ protected:
         auto t1 = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(PersonalizePopup::onTower), 0.7f);
         t1->toggle(ci::getShowTower());
         m_buttonMenu->addChildAtPosition(t1, Anchor::Center, {-100.f, -68.f});
-        auto l1 = makeLabel("Mostrar torre", -68.f, 10.f);
+        auto l1 = makeLabel("Mostrar carril de flechas", -68.f, 10.f);
 
         auto t2 = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(PersonalizePopup::onLine), 0.7f);
         t2->toggle(ci::getShowLine());
@@ -177,9 +177,9 @@ protected:
     }
 
     void refreshLabels() {
-        m_opLbl->setString(fmt::format("Opacidad barra verde: {}%", static_cast<int>(std::round(ci::getOpacity() * 100.f))).c_str());
-        m_sizeLbl->setString(fmt::format("Tamano de la torre: {}%", static_cast<int>(std::round(ci::getTowerScale() * 100.f))).c_str());
-        m_distLbl->setString(fmt::format("Aviso de la torre: {} bloques", static_cast<int>(std::round(ci::getWarnBlocks()))).c_str());
+        m_opLbl->setString(fmt::format("Opacidad de la barra verde: {}%", static_cast<int>(std::round(ci::getOpacity() * 100.f))).c_str());
+        m_sizeLbl->setString(fmt::format("Tamano del carril: {}%", static_cast<int>(std::round(ci::getTowerScale() * 100.f))).c_str());
+        m_distLbl->setString(fmt::format("Distancia de las flechas: {} bloques", static_cast<int>(std::round(ci::getWarnBlocks()))).c_str());
     }
 
     void onOpacity(CCObject* sender) {
