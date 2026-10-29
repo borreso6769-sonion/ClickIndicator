@@ -126,6 +126,107 @@ public:
 };
 
 // =====================================================================
+//  Popup: Personalizar
+// =====================================================================
+class PersonalizePopup : public geode::Popup {
+protected:
+    CCLabelBMFont* m_opLbl = nullptr;
+    CCLabelBMFont* m_sizeLbl = nullptr;
+    CCLabelBMFont* m_distLbl = nullptr;
+
+    CCLabelBMFont* makeLabel(std::string const& text, float y, float x = 0.f) {
+        auto lbl = CCLabelBMFont::create(text.c_str(), "bigFont.fnt");
+        lbl->setScale(0.42f);
+        m_mainLayer->addChildAtPosition(lbl, Anchor::Center, {x, y});
+        return lbl;
+    }
+
+    Slider* makeSlider(float y, SEL_MenuHandler cb, float value) {
+        auto slider = Slider::create(this, cb, 0.7f);
+        slider->setValue(std::clamp(value, 0.f, 1.f));
+        m_mainLayer->addChildAtPosition(slider, Anchor::Center, {0.f, y});
+        return slider;
+    }
+
+    bool init() {
+        if (!Popup::init(280.f, 310.f)) return false;
+        this->setTitle("Personalizar");
+
+        m_opLbl = makeLabel("", 98.f);
+        makeSlider(78.f, menu_selector(PersonalizePopup::onOpacity), ci::getOpacity());
+
+        m_sizeLbl = makeLabel("", 46.f);
+        makeSlider(26.f, menu_selector(PersonalizePopup::onSize), ci::getTowerScale() - 0.5f);
+
+        m_distLbl = makeLabel("", -6.f);
+        makeSlider(-26.f, menu_selector(PersonalizePopup::onDist), (ci::getWarnBlocks() - 5.f) / 25.f);
+
+        auto t1 = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(PersonalizePopup::onTower), 0.7f);
+        t1->toggle(ci::getShowTower());
+        m_buttonMenu->addChildAtPosition(t1, Anchor::Center, {-100.f, -68.f});
+        auto l1 = makeLabel("Mostrar torre", -68.f, 10.f);
+
+        auto t2 = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(PersonalizePopup::onLine), 0.7f);
+        t2->toggle(ci::getShowLine());
+        m_buttonMenu->addChildAtPosition(t2, Anchor::Center, {-100.f, -108.f});
+        auto l2 = makeLabel("Linea del jugador", -108.f, 10.f);
+        (void)l1; (void)l2;
+
+        this->refreshLabels();
+        return true;
+    }
+
+    void refreshLabels() {
+        m_opLbl->setString(fmt::format("Opacidad barra verde: {}%", static_cast<int>(std::round(ci::getOpacity() * 100.f))).c_str());
+        m_sizeLbl->setString(fmt::format("Tamano de la torre: {}%", static_cast<int>(std::round(ci::getTowerScale() * 100.f))).c_str());
+        m_distLbl->setString(fmt::format("Aviso de la torre: {} bloques", static_cast<int>(std::round(ci::getWarnBlocks()))).c_str());
+    }
+
+    void onOpacity(CCObject* sender) {
+        float v = std::clamp(static_cast<SliderThumb*>(sender)->getValue(), 0.f, 1.f);
+        Mod::get()->setSavedValue<float>("green-opacity", v);
+        this->refreshLabels();
+        ci::refreshOverlay();
+    }
+
+    void onSize(CCObject* sender) {
+        float v = std::clamp(static_cast<SliderThumb*>(sender)->getValue(), 0.f, 1.f);
+        Mod::get()->setSavedValue<float>("tower-scale", 0.5f + v);
+        this->refreshLabels();
+        ci::refreshOverlay();
+    }
+
+    void onDist(CCObject* sender) {
+        float v = std::clamp(static_cast<SliderThumb*>(sender)->getValue(), 0.f, 1.f);
+        Mod::get()->setSavedValue<float>("warn-blocks", 5.f + v * 25.f);
+        this->refreshLabels();
+    }
+
+    void onTower(CCObject* sender) {
+        bool on = !static_cast<CCMenuItemToggler*>(sender)->isToggled();
+        Mod::get()->setSavedValue<bool>("show-tower", on);
+        ci::refreshOverlay();
+    }
+
+    void onLine(CCObject* sender) {
+        bool on = !static_cast<CCMenuItemToggler*>(sender)->isToggled();
+        Mod::get()->setSavedValue<bool>("show-player-line", on);
+        ci::refreshOverlay();
+    }
+
+public:
+    static PersonalizePopup* create() {
+        auto ret = new PersonalizePopup();
+        if (ret->init()) {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
+    }
+};
+
+// =====================================================================
 //  Menu principal: Empezar/Detener, Guardar, Borrar, Usar, Guardados
 // =====================================================================
 class MenuPopup : public geode::Popup {
@@ -135,7 +236,7 @@ protected:
     CCLabelBMFont* m_status = nullptr;
 
     bool init() {
-        if (!Popup::init(240.f, 290.f)) return false;
+        if (!Popup::init(240.f, 340.f)) return false;
         this->setTitle("Click Indicator");
 
         auto makeBtn = [this](char const* text, SEL_MenuHandler cb, float y, ButtonSprite*& out) {
@@ -145,15 +246,19 @@ protected:
         };
         ButtonSprite* tmp = nullptr;
 
-        makeBtn("Empezar", menu_selector(MenuPopup::onStart), 62.f, m_startSpr);
-        makeBtn("Guardar", menu_selector(MenuPopup::onSave), 24.f, tmp);
-        makeBtn("Borrar", menu_selector(MenuPopup::onDelete), -14.f, tmp);
-        makeBtn("Usar", menu_selector(MenuPopup::onUse), -52.f, m_useSpr);
+        makeBtn("Empezar", menu_selector(MenuPopup::onStart), 90.f, m_startSpr);
+        makeBtn("Guardar", menu_selector(MenuPopup::onSave), 52.f, tmp);
+        makeBtn("Borrar", menu_selector(MenuPopup::onDelete), 14.f, tmp);
+        makeBtn("Usar", menu_selector(MenuPopup::onUse), -24.f, m_useSpr);
 
         // Boton de abajo: abre la lista de guardados
         auto listSpr = ButtonSprite::create("Guardados", 150, true, "bigFont.fnt", "GJ_button_02.png", 30.f, 0.7f);
         auto listBtn = CCMenuItemSpriteExtra::create(listSpr, this, menu_selector(MenuPopup::onList));
-        m_buttonMenu->addChildAtPosition(listBtn, Anchor::Center, {0.f, -98.f});
+        m_buttonMenu->addChildAtPosition(listBtn, Anchor::Center, {0.f, -70.f});
+
+        auto perSpr = ButtonSprite::create("Personalizar", 150, true, "bigFont.fnt", "GJ_button_02.png", 30.f, 0.7f);
+        auto perBtn = CCMenuItemSpriteExtra::create(perSpr, this, menu_selector(MenuPopup::onCustomize));
+        m_buttonMenu->addChildAtPosition(perBtn, Anchor::Center, {0.f, -108.f});
 
         m_status = CCLabelBMFont::create("", "chatFont.fnt");
         m_status->setScale(0.8f);
@@ -242,6 +347,10 @@ protected:
 
     void onList(CCObject*) {
         SavedListPopup::create()->show();
+    }
+
+    void onCustomize(CCObject*) {
+        PersonalizePopup::create()->show();
     }
 
 public:
@@ -371,8 +480,14 @@ class $modify(CIPlayLayer, PlayLayer) {
         PlayLayer::levelComplete();
     }
 
+    void postUpdate(float dt) {
+        PlayLayer::postUpdate(dt);
+        if (ci::usingSaved) ci::updateVisuals(this);
+    }
+
     void onQuit() {
         ci::usingSaved = false;
+        ci::clearVisuals();
         PlayLayer::onQuit();
     }
 };
