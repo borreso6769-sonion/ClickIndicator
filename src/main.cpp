@@ -245,6 +245,10 @@ protected:
     }
 
 public:
+    void closeMenu() {
+        this->onClose(nullptr);
+    }
+
     static MenuPopup* create() {
         auto ret = new MenuPopup();
         if (ret->init()) {
@@ -285,13 +289,13 @@ class $modify(CIPauseLayer, PauseLayer) {
 //  Tecla O: abre / cierra el menu (solo dentro de un nivel)
 // =====================================================================
 class $modify(CIKeyboardDispatcher, CCKeyboardDispatcher) {
-    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat) {
+    bool dispatchKeyboardMSG(enumKeyCodes key, bool down, bool repeat, double timestamp) {
         if (down && !repeat && key == KEY_O && PlayLayer::get()) {
             auto scene = CCScene::get();
             if (scene) {
                 if (auto open = scene->getChildByType<MenuPopup>(0)) {
                     // Ya esta abierto: lo cerramos
-                    open->onClose(nullptr);
+                    open->closeMenu();
                     return true;
                 }
                 // Si hay otro popup abierto (por ejemplo el de nombre), no hacemos nada
@@ -301,7 +305,7 @@ class $modify(CIKeyboardDispatcher, CCKeyboardDispatcher) {
                 }
             }
         }
-        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat);
+        return CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat, timestamp);
     }
 };
 
